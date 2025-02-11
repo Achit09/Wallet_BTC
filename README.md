@@ -79,7 +79,10 @@
 ## 👨‍💻 作者
 
 [Achit999]
+<<<<<<< HEAD
 Donate BTC Address: bc1qmvplzwalslgmeavt525ah6waygkrk99gpc22hj
+=======
+>>>>>>> 673a08467e56e1a2a3de7b294ca3b42edb75796f
 
 ## 📜 授權
 

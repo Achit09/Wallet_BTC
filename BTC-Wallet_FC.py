@@ -94,6 +94,14 @@ def get_address_type(address):
         return "交易所熱錢包"
     elif address.startswith(('1GR9q', '1J6PY', '1BitG')):
         return "早期用戶地址"
+    elif address.startswith('1FeexV'):
+        return "大額交易地址"
+    elif address.startswith('bc1qx'):
+        return "SegWit大戶地址"
+    elif address.startswith('385cR5'):
+        return "礦池地址"
+    elif address.startswith('3CxQoE'):
+        return "交易所熱錢包"
     return "普通地址"
 
 def save_found_address(address, wif, balance, address_type):
