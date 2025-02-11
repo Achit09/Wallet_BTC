@@ -109,28 +109,61 @@ def save_found_address(address, wif, balance, address_type):
     try:
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # 獲取當前腳本所在目錄
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
         # 有餘額的地址保存到 found_with_balance.txt
         if balance > 0:
-            with open('found_with_balance.txt', 'a', encoding='utf-8') as f:
-                f.write("\n" + "!" * 50)
+            balance_file = os.path.join(script_dir, 'found_with_balance.txt')
+            try:
+                with open(balance_file, 'a', encoding='utf-8') as f:
+                    f.write("\n" + "!" * 50)
+                    f.write(f"\n發現時間: {current_time}")
+                    f.write(f"\n地址: {address}")
+                    f.write(f"\n類型: {address_type}")
+                    f.write(f"\n私鑰: {wif}")
+                    f.write(f"\n餘額: {balance} BTC")
+                    f.write("\n" + "!" * 50 + "\n")
+            except PermissionError:
+                print(f"無法寫入文件 {balance_file}，請檢查文件權限")
+                # 嘗試在用戶目錄下保存
+                user_dir = os.path.expanduser('~')
+                balance_file = os.path.join(user_dir, 'found_with_balance.txt')
+                with open(balance_file, 'a', encoding='utf-8') as f:
+                    f.write(f"\n發現時間: {current_time}")
+                    f.write(f"\n地址: {address}")
+                    f.write(f"\n類型: {address_type}")
+                    f.write(f"\n私鑰: {wif}")
+                    f.write(f"\n餘額: {balance} BTC")
+                    f.write("\n" + "!" * 50 + "\n")
+        
+        # 所有高價值地址都保存到 high_value_addresses.txt
+        value_file = os.path.join(script_dir, 'high_value_addresses.txt')
+        try:
+            with open(value_file, 'a', encoding='utf-8') as f:
                 f.write(f"\n發現時間: {current_time}")
                 f.write(f"\n地址: {address}")
                 f.write(f"\n類型: {address_type}")
                 f.write(f"\n私鑰: {wif}")
                 f.write(f"\n餘額: {balance} BTC")
-                f.write("\n" + "!" * 50 + "\n")
-        
-        # 所有高價值地址都保存到 high_value_addresses.txt
-        with open('high_value_addresses.txt', 'a', encoding='utf-8') as f:
-            f.write(f"\n發現時間: {current_time}")
-            f.write(f"\n地址: {address}")
-            f.write(f"\n類型: {address_type}")
-            f.write(f"\n私鑰: {wif}")
-            f.write(f"\n餘額: {balance} BTC")
-            f.write("\n" + "-" * 50 + "\n")
+                f.write("\n" + "-" * 50 + "\n")
+        except PermissionError:
+            print(f"無法寫入文件 {value_file}，請檢查文件權限")
+            # 嘗試在用戶目錄下保存
+            user_dir = os.path.expanduser('~')
+            value_file = os.path.join(user_dir, 'high_value_addresses.txt')
+            with open(value_file, 'a', encoding='utf-8') as f:
+                f.write(f"\n發現時間: {current_time}")
+                f.write(f"\n地址: {address}")
+                f.write(f"\n類型: {address_type}")
+                f.write(f"\n私鑰: {wif}")
+                f.write(f"\n餘額: {balance} BTC")
+                f.write("\n" + "-" * 50 + "\n")
             
     except Exception as e:
         print(f"保存錯誤: {str(e)}")
+        # 如果出現錯誤，至少在控制台輸出重要信息
+        print(f"重要發現！地址: {address}, 私鑰: {wif}, 餘額: {balance} BTC")
 
 def main():
     total_checked = 0
