@@ -8,9 +8,18 @@ import json
 from multiprocessing import Value, Lock
 import psutil
 import platform
+import sys
+import signal
 
 # 設置日誌
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('btc_wallet_search.log')
+    ]
+)
 logger = logging.getLogger(__name__)
 
 class SystemInfo:
@@ -31,17 +40,16 @@ class SystemInfo:
             logger.info(f"CPU使用率: {cpu_percent}%")
             logger.info(f"內存使用率: {memory.percent}%")
             
-            # 根據不同平台和系統資源調整進程數
+            # Windows 特別處理
             if system_platform == "Windows":
-                # Windows系統通常建議使用較少的進程
-                optimal_count = max(1, cpu_count - 2)
+                # Windows下更保守的進程數設置
+                optimal_count = max(1, min(cpu_count - 2, 4))
             else:
-                # Linux/MacOS可以使用更多進程
                 optimal_count = max(1, cpu_count)
             
-            # 根據系統負載調整
+            # 系統負載調整
             if cpu_percent > 80:
-                optimal_count = max(1, optimal_count - 2)
+                optimal_count = max(1, optimal_count - 1)
             if memory.percent > 80:
                 optimal_count = max(1, optimal_count - 1)
                 
@@ -50,22 +58,37 @@ class SystemInfo:
             
         except Exception as e:
             logger.warning(f"獲取系統信息時出錯: {e}")
-            return 2  # 返回保守的默認值
+            return 2
 
 class BTCWalletSearcherMP:
     def __init__(self, process_count=None):
-        # 獲取最優進程數
         self.process_count = process_count or SystemInfo.get_optimal_process_count()
         self.addresses_checked = Value('i', 0)
         self.valuable_found = Value('i', 0)
-        self.start_time = time.time()
+        self.start_time = Value('d', time.time())
         self.lock = Lock()
+        self.stop_flag = Value('i', 0)
+        
+    def signal_handler(self, signum, frame):
+        self.stop_flag.value = 1
+        logger.info("接收到停止信號")
         
     def check_wallet(self):
         process_name = mp.current_process().name
-        logger.info(f"進程 {process_name} 已啟動")
+        pid = os.getpid()
+        logger.info(f"進程 {process_name} (PID: {pid}) 已啟動")
         
-        while True:
+        # Windows下設置更低的進程優先級
+        if platform.system() == "Windows":
+            try:
+                import win32api
+                import win32process
+                win32api.SetThreadPriority(win32api.GetCurrentThread(), 
+                                         win32process.THREAD_PRIORITY_BELOW_NORMAL)
+            except ImportError:
+                pass
+        
+        while not self.stop_flag.value:
             try:
                 private_key = Key()
                 address = private_key.address
@@ -84,6 +107,7 @@ class BTCWalletSearcherMP:
                     
             except Exception as e:
                 logger.error(f"進程 {process_name} 發生錯誤: {str(e)}")
+                time.sleep(0.1)  # 錯誤發生時短暫暫停
                 continue
     
     def is_valuable_address(self, address):
@@ -113,10 +137,11 @@ class BTCWalletSearcherMP:
             logger.error(f"保存錢包時發生錯誤: {str(e)}")
     
     def print_status(self):
-        elapsed_time = time.time() - self.start_time
-        speed = self.addresses_checked.value / elapsed_time if elapsed_time > 0 else 0
-        
-        status = f"""
+        try:
+            elapsed_time = time.time() - self.start_time.value
+            speed = self.addresses_checked.value / elapsed_time if elapsed_time > 0 else 0
+            
+            status = f"""
 === 比特幣錢包搜索狀態（多進程版本）===
 進程數: {self.process_count}
 總計檢查地址數: {self.addresses_checked.value:,}
@@ -125,9 +150,15 @@ class BTCWalletSearcherMP:
 運行時間: {elapsed_time:.1f} 秒
 ==========================================
 """
-        print(status)
+            print(status)
+            sys.stdout.flush()  # 確保Windows下正確輸出
+        except Exception as e:
+            logger.error(f"顯示狀態時發生錯誤: {str(e)}")
     
     def start_search(self):
+        # 設置信號處理
+        signal.signal(signal.SIGINT, self.signal_handler)
+        
         logger.info(f"正在使用 {self.process_count} 個進程開始搜索...")
         logger.info("初始化進程池...")
         
@@ -135,36 +166,44 @@ class BTCWalletSearcherMP:
         try:
             for i in range(self.process_count):
                 p = mp.Process(target=self.check_wallet, name=f"Searcher-{i+1}")
-                p.daemon = True  # 設置為守護進程
+                p.daemon = True
                 processes.append(p)
             
-            # 逐個啟動進程並檢查狀態
             for p in processes:
                 p.start()
-                time.sleep(0.5)  # 給每個進程一些啟動時間
+                time.sleep(0.5)
                 if not p.is_alive():
                     logger.error(f"進程 {p.name} 啟動失敗")
                 else:
                     logger.info(f"進程 {p.name} 啟動成功")
             
-            # 等待所有進程
-            for p in processes:
-                p.join()
+            # 主進程等待
+            while not self.stop_flag.value:
+                time.sleep(1)
                 
-        except KeyboardInterrupt:
-            logger.info("接收到停止信號，正在關閉進程...")
-            for p in processes:
-                if p.is_alive():
-                    p.terminate()
-            logger.info("所有進程已停止")
         except Exception as e:
             logger.error(f"程序運行時發生錯誤: {str(e)}")
+        finally:
+            self.stop_flag.value = 1
+            logger.info("正在關閉所有進程...")
             for p in processes:
                 if p.is_alive():
                     p.terminate()
+                    p.join(timeout=1)
+            logger.info("所有進程已停止")
 
-if __name__ == "__main__":
-    # Windows支持
+def main():
+    if platform.system() == "Windows":
+        # Windows特定設置
+        import ctypes
+        try:
+            ctypes.windll.kernel32.SetProcessPriorityClass(
+                ctypes.windll.kernel32.GetCurrentProcess(),
+                0x00004000 #BELOW_NORMAL_PRIORITY_CLASS
+            )
+        except:
+            pass
+    
     mp.freeze_support()
     
     try:
@@ -178,4 +217,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n程序已停止")
     except Exception as e:
-        logger.error(f"程序發生致命錯誤: {str(e)}") 
+        logger.error(f"程序發生致命錯誤: {str(e)}")
+
+if __name__ == "__main__":
+    main() 
