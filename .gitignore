@@ -1,1 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 日誌文件
+*.log
+
+# 本地配置
+.env
+
+# 編輯器配置
+.vscode/
+.idea/
+
+# 生成的錢包文件
+valuable_wallets_mp.txt
 high_value_addresses.txt
