@@ -1,4 +1,5 @@
 bit==0.8.0
 ecdsa==0.18.0
 requests==2.31.0
-bitcoin==1.1.42 
+bitcoin==1.1.42
+psutil==5.9.5 

@@ -35,18 +35,28 @@
 
 ## 🚀 使用方法
 
-1. 安裝必要套件：
+### 多進程版本（推薦）
+1. 安裝依賴：
    ```bash
-   pip install ecdsa
-   pip install base58
-   pip install bitcoin
-   pip install requests
+   pip install -r requirements.txt
    ```
 
-2. 運行程式：  
+2. 運行程式：
    ```bash
-   python BTC-Wallet_FC.py
+   python BTC-Wallet-MP.py
    ```
+
+### 多進程版本特點
+- 自動檢測系統資源
+- 智能調整進程數量
+- 支持 Windows/Linux/MacOS
+- 更高的搜索效率
+- 更好的系統兼容性
+
+### 系統要求
+- Python 3.8+
+- 足夠的系統內存
+- 多核心處理器（建議）
 
 ## 📝 運行顯示
 
